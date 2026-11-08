@@ -1,0 +1,93 @@
+{
+ "startedAt": "2026-11-08T23:39:40+01:00",
+ "interclub": {
+  "leagues": 13,
+  "draws": 78,
+  "groups": 72,
+  "teams": 549,
+  "matches": 3752,
+  "played": 1140,
+  "rule_validated": 69,
+  "table_mismatch": [
+   "BVRZ-J"
+  ],
+  "problems": [],
+  "issues": [],
+  "ok": true,
+  "packs": [
+   "pack-01",
+   "pack-02",
+   "pack-03",
+   "pack-04",
+   "pack-05",
+   "pack-06",
+   "pack-07"
+  ],
+  "updatedAt": "2026-11-08T23:39:40+01:00"
+ },
+ "tournaments": {
+  "items": 145,
+  "upcoming_scraped": 93,
+  "upcoming_site": 100,
+  "pages": 15,
+  "international": 2,
+  "international_error": null,
+  "no_location": 0,
+  "no_category": 139,
+  "sample": [
+   {
+    "id": "BB2B1226-57FB-4111-B969-14078308CE55",
+    "name": "32. Nationales Junioren-Ranglistenturnier Altdorf - SBJS",
+    "start": "2026-08-22",
+    "end": "2026-08-22",
+    "category": "",
+    "types": [
+     "NC"
+    ],
+    "ages": [
+     "U17"
+    ],
+    "location": "Altdorf",
+    "canton": "UR",
+    "url": "https://sb.tournamentsoftware.com/sport/tournament?id=BB2B1226-57FB-4111-B969-14078308CE55",
+    "tags": []
+   },
+   {
+    "id": "82C41F21-F880-4B91-B6A3-F39D8BC2BE7E",
+    "name": "14. Reussbühler Cup",
+    "start": "2026-08-29",
+    "end": "2026-08-29",
+    "category": "",
+    "types": [
+     "NC"
+    ],
+    "ages": [],
+    "location": "Luzern",
+    "canton": "LU",
+    "url": "https://sb.tournamentsoftware.com/sport/tournament?id=82C41F21-F880-4B91-B6A3-F39D8BC2BE7E",
+    "tags": []
+   },
+   {
+    "id": "8F3DB0EB-E884-49EB-B64C-431E085A736B",
+    "name": "4. Thurgauer Junioren Cup",
+    "start": "2026-08-29",
+    "end": "2026-08-29",
+    "category": "",
+    "types": [
+     "NC"
+    ],
+    "ages": [
+     "U17"
+    ],
+    "location": "Weinfelden",
+    "canton": "TG",
+    "url": "https://sb.tournamentsoftware.com/sport/tournament?id=8F3DB0EB-E884-49EB-B64C-431E085A736B",
+    "tags": []
+   }
+  ],
+  "ok": false,
+  "updatedAt": null
+ },
+ "finishedAt": "2026-11-08T23:47:11+01:00",
+ "ok": false
+}
