@@ -301,6 +301,7 @@ CANTON = {
 }
 AGE_RE = re.compile(r"U0?(\d{1,2})")
 
+CANTON.update({"Pfäffikon": "ZH", "Porrentruy": "JU", "Cernier": "NE", "Wohlen": "AG", "Aesch": "BL"})
 
 def parse_ages(s):
     ages = set()
@@ -319,9 +320,9 @@ def types_for(cat):
         return ["RT", "NL"]
     if cat in ("RT", "RTJ", "SBJS", "NL"):
         return [cat]
-    if cat in ("Other", "AirBadminton", "Autre"):
-        return ["AUTRE"]
-    return ["NC"]
+    if not cat:
+        return ["NC"]
+    return ["AUTRE"]  # Other, AirBadminton, CJ (circuit junior) and any new code
 
 
 def tags_for(name, cat):
@@ -433,31 +434,64 @@ def parse_row(row, link, rx, today):
             "ages": ages, "location": loc, "up": end >= today}
 
 
-def tournament_rows(html, today):
-    """Rows of one page of the national tournament list: (rows, upcoming_total_on_site, next_page_url, page_no)."""
-    soup = soup_of(html)
-    rows, done = [], set()
+def make_item(tid, name, start, end, cat, ages, loc, url):
+    return {"id": tid, "name": re.sub(r"\s+", " ", name).strip().strip('"'), "start": start, "end": end, "category": cat,
+            "types": types_for(cat), "ages": ages, "location": loc, "canton": CANTON.get(loc, ""),
+            "url": url or f"https://sb.tournamentsoftware.com/sport/tournament?id={tid}", "tags": tags_for(name, cat)}
+
+
+def structured_rows(soup):
+    """The list as swiss-badminton.ch renders it (Nov 2026): two .c-matchcenter-tournament--list blocks,
+    upcoming first, then past; each item has <time datetime>, __title a, __location, __type, __age-group."""
+    out = []
+    for idx, block in enumerate(soup.select(".c-matchcenter-tournament--list")):
+        status = block.select_one("[role=status]")
+        m = re.search(r"(\d+)", status.get_text(" ", strip=True)) if status else None
+        section = {"up": idx == 0, "total": int(m.group(1)) if m else None, "rows": []}
+        for it in block.select(".c-matchcenter-tournament__item"):
+            links = [x for x in it.find_all("a", href=True) if TS_ID.search(x["href"])]
+            if not links:
+                continue
+            tid = TS_ID.search(links[0]["href"]).group(1).upper()
+            times = [t["datetime"][:10] for t in it.select("time[datetime]")]
+            if not times:
+                dm = DATE_RE.search(txt(it))
+                if not dm:
+                    continue
+                times = [x for x in parse_dates(dm.group(0).replace("–", "-")) if x]
+            title = it.select_one(".c-matchcenter-tournament__title")
+            name = txt(title) if title else max((txt(x) for x in links), key=len)
+            loc_el = it.select_one(".c-matchcenter-tournament__location")
+            type_el = it.select_one(".c-matchcenter-tournament__type")
+            age_el = it.select_one(".c-matchcenter-tournament__age-group")
+            ttxt = txt(type_el) if type_el else ""
+            cat = ttxt.split(" - ")[0].strip() if ttxt else ""
+            url = next((x["href"] for x in links if "/sport/tournament" in x["href"]), None)
+            section["rows"].append(make_item(tid, name, times[0], times[-1], cat,
+                                             parse_ages(txt(age_el)) if age_el else [], txt(loc_el) if loc_el else "", url))
+        out.append(section)
+    return out
+
+
+def generic_rows(soup, today):
+    """Fallback if the markup changes: rows found around each tournamentsoftware link."""
+    up, past, done = [], [], set()
     for a in soup.find_all("a", href=True):
         m = TS_ID.search(a["href"])
         if not m or m.group(1).upper() in done:
             continue
-        tid = m.group(1).upper()
         row = row_of(a, TS_ID)
-        if row is None:
-            continue
-        p = parse_row(row, a, TS_ID, today)
+        p = parse_row(row, a, TS_ID, today) if row is not None else None
         if not p:
             continue
+        tid = m.group(1).upper()
         done.add(tid)
-        url = a["href"] if "/sport/tournament" in a["href"] else f"https://sb.tournamentsoftware.com/sport/tournament?id={tid}"
-        cat = p["category"]
-        tags = tags_for(p["name"], cat)
-        rows.append({"id": tid, "name": p["name"], "start": p["start"], "end": p["end"], "category": cat, "types": types_for(cat),
-                     "ages": p["ages"], "location": p["location"], "canton": CANTON.get(p["location"], ""), "url": url,
-                     "tags": tags, "_up": p["up"]})
+        url = a["href"] if "/sport/tournament" in a["href"] else None
+        (up if p["up"] else past).append(make_item(tid, p["name"], p["start"], p["end"], p["category"], p["ages"], p["location"], url))
     text = re.sub(r"\s+", " ", soup.get_text(" "))
-    tot = re.search(r"(\d+)\s+tournois?\s+trouvés?", text, re.I)
-    return rows, (int(tot.group(1)) if tot else None), soup
+    tots = [int(x) for x in re.findall(r"(\d+)\s+tournois?\s+trouvés?", text, re.I)]
+    return [{"up": True, "total": tots[0] if tots else None, "rows": up},
+            {"up": False, "total": tots[1] if len(tots) > 1 else None, "rows": past}]
 
 
 def next_page(soup, base, cur):
@@ -470,25 +504,36 @@ def next_page(soup, base, cur):
 
 
 def scrape_tournaments(season_start, today, debug_dir=None):
-    url, pages, rows, total = TOURS, 0, {}, None
-    while url and pages < 15:
+    """Follow the 'en voir plus' pages until every upcoming tournament is read and the past list
+    reaches the start of the season. Returns (items, upcoming_total_on_site, upcoming_read, pages, layout)."""
+    url, pages, up, past, total, layout = TOURS, 0, {}, {}, None, "structured"
+    while url and pages < 25:
         pages += 1
         html = get(url).text
         if debug_dir and pages <= 2:
             open(os.path.join(debug_dir, f"tournois-p{pages}.html"), "w", encoding="utf-8").write(html)
-        got, tot, soup = tournament_rows(html, today)
-        total = total if total is not None else tot
-        new = [r for r in got if r["id"] not in rows]
-        for r in got:
-            rows.setdefault(r["id"], r)
-        past = [r for r in got if not r["_up"]]
-        older = past and min(r["end"] for r in past) < season_start
+        soup = soup_of(html)
+        sections = structured_rows(soup)
+        if not any(sec["rows"] for sec in sections):
+            sections, layout = generic_rows(soup, today), "generic"
+        got_up = [r for sec in sections if sec["up"] for r in sec["rows"]]
+        got_past = [r for sec in sections if not sec["up"] for r in sec["rows"]]
+        if total is None:
+            total = next((sec["total"] for sec in sections if sec["up"]), None)
+        fresh = [r for r in got_up if r["id"] not in up] + [r for r in got_past if r["id"] not in past]
+        for r in got_up:
+            up.setdefault(r["id"], r)
+        for r in got_past:
+            past.setdefault(r["id"], r)
+        need_up = total is not None and len(up) < total
+        need_past = bool(got_past) and min(r["end"] for r in got_past) >= season_start
         nxt = next_page(soup, url, pages)
-        url = nxt if (nxt and new and (any(r["_up"] for r in got) or not older)) else None
+        url = nxt if (nxt and fresh and (need_up or need_past)) else None
         time.sleep(DELAY)
-    items = [dict((k, v) for k, v in r.items() if k != "_up") for r in rows.values() if r["end"] >= season_start]
-    n_up = sum(1 for r in rows.values() if r["_up"])
-    return sorted(items, key=lambda t: (t["start"], t["end"], t["name"])), total, n_up, pages
+    items = dict(past)
+    items.update(up)
+    items = [t for t in items.values() if t["end"] >= season_start]
+    return sorted(items, key=lambda t: (t["start"], t["end"], t["name"])), total, len(up), pages, layout
 
 
 HITO = re.compile(r"(hitobito\.[^/]+/.*?/events/(\d+))", re.I)
@@ -506,6 +551,15 @@ def scrape_international(today, debug_dir=None):
             continue
         row = row_of(a, HITO)
         if row is None:
+            continue
+        times = [t["datetime"][:10] for t in row.select("time[datetime]")]
+        title = row.select_one(".c-matchcenter-tournament__title")
+        meta = row.select_one(".c-matchcenter-tournament__meta")
+        if times and title:  # markup of Nov 2026
+            done.add(m.group(2))
+            out.append({"id": "INT-" + m.group(2), "name": txt(title), "start": times[0], "end": times[-1],
+                        "category": "International", "types": ["INT"], "ages": parse_ages(txt(meta)) if meta else [],
+                        "location": "", "canton": "", "url": urljoin(INTL, a["href"]), "tags": ["Équipe nationale"]})
             continue
         ss = [norm_t(s) for s in strings_of(row)]
         joined = " | ".join(ss)
@@ -586,7 +640,7 @@ def main():
 
     # tournaments (national list + national-team events)
     try:
-        tours, site_total, n_up, pages = scrape_tournaments(season_start, today, debug_dir)
+        tours, site_total, n_up, pages, layout = scrape_tournaments(season_start, today, debug_dir)
         intl, intl_err = [], None
         try:
             intl = scrape_international(today, debug_dir)
@@ -594,15 +648,18 @@ def main():
             intl_err = f"{type(e).__name__}: {e}"
         missing_loc = sum(1 for t in tours if not t["location"])
         missing_cat = sum(1 for t in tours if not t["category"])
-        tr = {"items": len(tours), "upcoming_scraped": n_up, "upcoming_site": site_total, "pages": pages,
+        tr = {"items": len(tours), "upcoming_scraped": n_up, "upcoming_site": site_total, "pages": pages, "layout": layout,
               "international": len(intl), "international_error": intl_err, "no_location": missing_loc, "no_category": missing_cat,
               "sample": tours[:3]}
         tr["ok"] = (len(tours) >= 50 and (site_total is None or n_up == site_total) and missing_cat <= len(tours) // 10
                     and missing_loc <= len(tours) // 5)
         if tr["ok"]:
+            # the site drops national-team events once they are over: keep the ones already known for the season
             old_intl = [t for t in (load("sb_tournaments.json") or {}).get("items", []) if t.get("types") == ["INT"]]
-            if intl_err or not intl:  # keep the last known national-team events
-                intl = [t for t in old_intl if t["end"] >= season_start]
+            ids = {t["id"] for t in intl}
+            keep = [t for t in old_intl if t["id"] not in ids and t["end"] >= season_start
+                    and (intl_err or not intl or t["end"] < today)]
+            intl = intl + keep
             items = sorted(tours + intl, key=lambda t: (t["start"], t["end"], t["name"]))
             dump({"items": items, "updatedAt": stamp, "source": TOURS}, "sb_tournaments.json")
             tr["updatedAt"] = stamp
