@@ -1,5 +1,5 @@
 {
- "startedAt": "2026-11-08T23:49:28+01:00",
+ "startedAt": "2026-11-09T00:00:51+01:00",
  "interclub": {
   "leagues": 13,
   "draws": 78,
@@ -23,12 +23,12 @@
    "pack-06",
    "pack-07"
   ],
-  "updatedAt": "2026-11-08T23:49:28+01:00"
+  "updatedAt": "2026-11-09T00:00:51+01:00"
  },
  "tournaments": {
   "items": 145,
-  "upcoming_scraped": 100,
-  "upcoming_site": 100,
+  "upcoming_scraped": 93,
+  "upcoming_site": 93,
   "pages": 4,
   "layout": "structured",
   "international": 2,
@@ -92,8 +92,8 @@
    }
   ],
   "ok": true,
-  "updatedAt": "2026-11-08T23:49:28+01:00"
+  "updatedAt": "2026-11-09T00:00:51+01:00"
  },
- "finishedAt": "2026-11-08T23:56:37+01:00",
+ "finishedAt": "2026-11-09T00:08:17+01:00",
  "ok": true
 }
