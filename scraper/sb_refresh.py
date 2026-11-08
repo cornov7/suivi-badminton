@@ -672,6 +672,7 @@ def main():
 
     if ic["ok"] or tr["ok"]:
         dump({"season": f"{season_y}/{(season_y + 1) % 100:02d}", "updatedAt": stamp, "missingLeagues": [],
+              "leagues": [{"id": fr, "name": fr, "order": i} for i, (_, fr) in enumerate(LEAGUES, 1)],
               "interclubUpdatedAt": ic.get("updatedAt"), "tournamentsUpdatedAt": tr.get("updatedAt"),
               "sources": [{"label": "Tournois nationaux", "url": TOURS}, {"label": "Match Center interclub", "url": MC},
                           {"label": "Sélections nationales", "url": INTL}],
