@@ -1,0 +1,53 @@
+name: Actualiser les données
+
+on:
+  schedule:
+    - cron: "17 3 * * *"   # chaque jour à 03:17 UTC (04:17 en hiver, 05:17 en été à Zurich)
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["scraper/**", ".github/workflows/**"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: actualiser
+  cancel-in-progress: false
+
+jobs:
+  collecte:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Installer les bibliothèques
+        run: pip install requests beautifulsoup4
+
+      - name: Collecter swiss-badminton.ch
+        id: collecte
+        continue-on-error: true
+        env:
+          # pages brutes enregistrées dans debug/ quand on modifie le programme ou qu'on lance à la main
+          SB_DEBUG: ${{ github.event_name != 'schedule' && '1' || '' }}
+        run: |
+          set -o pipefail
+          python scraper/sb_refresh.py data 2>&1 | tee run.log
+
+      - name: Enregistrer les données
+        if: always()
+        run: |
+          mkdir -p data
+          cp run.log data/last_run.log 2>/dev/null || true
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data
+          if [ -d debug ]; then git add debug; fi
+          if git diff --cached --quiet; then echo "Rien de nouveau"; exit 0; fi
+          git commit -m "Données du $(TZ=Europe/Zurich date '+%d.%m.%Y %H:%M')"
+          for i in 1 2 3; do git pull --rebase -q && git push -q && break; sleep 5; done
