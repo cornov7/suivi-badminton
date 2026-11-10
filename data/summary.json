@@ -1,12 +1,12 @@
 {
- "startedAt": "2026-11-09T05:18:46+01:00",
+ "startedAt": "2026-11-10T05:10:15+01:00",
  "interclub": {
   "leagues": 13,
   "draws": 78,
   "groups": 72,
   "teams": 549,
   "matches": 3752,
-  "played": 1140,
+  "played": 1155,
   "rule_validated": 69,
   "table_mismatch": [
    "BVRZ-J"
@@ -23,12 +23,12 @@
    "pack-06",
    "pack-07"
   ],
-  "updatedAt": "2026-11-09T05:18:46+01:00"
+  "updatedAt": "2026-11-10T05:10:15+01:00"
  },
  "tournaments": {
-  "items": 145,
-  "upcoming_scraped": 93,
-  "upcoming_site": 93,
+  "items": 146,
+  "upcoming_scraped": 94,
+  "upcoming_site": 94,
   "pages": 4,
   "layout": "structured",
   "international": 2,
@@ -92,8 +92,8 @@
    }
   ],
   "ok": true,
-  "updatedAt": "2026-11-09T05:18:46+01:00"
+  "updatedAt": "2026-11-10T05:10:15+01:00"
  },
- "finishedAt": "2026-11-09T05:25:48+01:00",
+ "finishedAt": "2026-11-10T05:17:32+01:00",
  "ok": true
 }
